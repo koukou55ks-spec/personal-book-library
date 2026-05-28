@@ -64,6 +64,96 @@ def test_created_book_is_returned_by_list_books(client: TestClient) -> None:
     assert body[0]["title"] == "Atomic Habits"
 
 
+def test_list_books_can_filter_by_search_query(client: TestClient) -> None:
+    client.post(
+        "/books",
+        json={
+            "title": "Atomic Habits",
+            "author": "James Clear",
+            "status": "unread",
+            "rating": 4,
+            "memo": None,
+        },
+    )
+    client.post(
+        "/books",
+        json={
+            "title": "Deep Work",
+            "author": "Cal Newport",
+            "status": "reading",
+            "rating": 5,
+            "memo": None,
+        },
+    )
+
+    response = client.get("/books", params={"q": "newport"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Deep Work"
+
+
+def test_list_books_can_filter_by_status(client: TestClient) -> None:
+    client.post(
+        "/books",
+        json={
+            "title": "Refactoring",
+            "author": "Martin Fowler",
+            "status": "finished",
+            "rating": 5,
+            "memo": None,
+        },
+    )
+    client.post(
+        "/books",
+        json={
+            "title": "Domain-Driven Design",
+            "author": "Eric Evans",
+            "status": "reading",
+            "rating": 4,
+            "memo": None,
+        },
+    )
+
+    response = client.get("/books", params={"status": "finished"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Refactoring"
+
+
+def test_list_books_can_combine_search_query_and_status(client: TestClient) -> None:
+    client.post(
+        "/books",
+        json={
+            "title": "Clean Architecture",
+            "author": "Robert C. Martin",
+            "status": "finished",
+            "rating": 5,
+            "memo": None,
+        },
+    )
+    client.post(
+        "/books",
+        json={
+            "title": "Clean Code",
+            "author": "Robert C. Martin",
+            "status": "reading",
+            "rating": 4,
+            "memo": None,
+        },
+    )
+
+    response = client.get("/books", params={"q": "clean", "status": "finished"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["title"] == "Clean Architecture"
+
+
 def test_update_book(client: TestClient) -> None:
     create_response = client.post(
         "/books",

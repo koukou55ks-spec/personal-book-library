@@ -1,11 +1,12 @@
 from collections.abc import Sequence
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Book
+from app.models import Book, ReadingStatus
 from app.schemas import BookCreate, BookResponse, BookUpdate
 
 router = APIRouter()
@@ -17,8 +18,30 @@ def health_check() -> dict[str, str]:
 
 
 @router.get("/books", response_model=list[BookResponse], tags=["books"])
-def list_books(db: Session = Depends(get_db)) -> Sequence[Book]:
-    statement = select(Book).order_by(Book.created_at.desc(), Book.id.desc())
+def list_books(
+    q: Optional[str] = Query(
+        default=None,
+        min_length=1,
+        description="Search by title or author",
+    ),
+    status: Optional[ReadingStatus] = Query(
+        default=None,
+        description="Filter by reading status",
+    ),
+    db: Session = Depends(get_db),
+) -> Sequence[Book]:
+    statement = select(Book)
+
+    if q:
+        keyword = f"%{q.strip()}%"
+        statement = statement.where(
+            Book.title.ilike(keyword) | Book.author.ilike(keyword)
+        )
+
+    if status is not None:
+        statement = statement.where(Book.status == status)
+
+    statement = statement.order_by(Book.created_at.desc(), Book.id.desc())
     return db.scalars(statement).all()
 
 
