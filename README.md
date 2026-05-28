@@ -28,17 +28,21 @@ backend/
     main.py
   tests/
     test_health.py
-  requirements.txt
+  pyproject.toml
+  uv.lock
 ```
 
 ## セットアップ
 
+前提:
+
+- `uv` がインストール済みであること
+- Python 3.9 以上が使えること
+
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+uv sync
+uv run uvicorn app.main:app --reload
 ```
 
 起動後、以下で動作確認できます。
@@ -50,8 +54,7 @@ uvicorn app.main:app --reload
 
 ```bash
 cd backend
-source .venv/bin/activate
-pytest
+uv run pytest
 ```
 
 ## 次の実装ステップ
