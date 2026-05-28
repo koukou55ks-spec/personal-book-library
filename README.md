@@ -28,6 +28,7 @@ backend/
   app/
     api/
       routes.py
+    .env.example
     database.py
     main.py
     models.py
@@ -38,6 +39,7 @@ backend/
   pyproject.toml
   uv.lock
 frontend/
+  .env.local.example
   src/
     app/
       layout.tsx
@@ -51,6 +53,7 @@ frontend/
     lib/
       api.ts
   package.json
+docker-compose.yml
 ```
 
 ## セットアップ
@@ -59,10 +62,29 @@ frontend/
 
 - `uv` がインストール済みであること
 - Python 3.9 以上が使えること
+- Node.js 20 以上が使えること
+- Docker Desktop などで `docker compose` が使えること
+
+### 1. PostgreSQL を起動する
+
+```bash
+docker compose up -d postgres
+```
+
+### 2. バックエンドの環境変数を用意する
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+### 3. バックエンドを起動する
 
 ```bash
 cd backend
 uv sync
+set -a
+source .env
+set +a
 uv run uvicorn app.main:app --reload
 ```
 
@@ -73,13 +95,19 @@ uv run uvicorn app.main:app --reload
 
 ## 環境変数
 
-ローカルでは `DATABASE_URL` を使って接続先を切り替えます。
+ローカルでは、バックエンドで `DATABASE_URL`、フロントエンドで `BACKEND_URL` を使います。
+
+バックエンド:
 
 ```bash
 export DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5432/personal_book_library"
 ```
 
-指定しない場合も、同じ PostgreSQL 接続先をデフォルトで参照します。
+フロントエンド:
+
+```bash
+export BACKEND_URL="http://127.0.0.1:8000"
+```
 
 ## テスト
 
@@ -90,10 +118,18 @@ uv run pytest
 
 ## フロントエンド起動
 
+### 4. フロントエンドの環境変数を用意する
+
+```bash
+cp frontend/.env.local.example frontend/.env.local
+```
+
+### 5. フロントエンドを起動する
+
 ```bash
 cd frontend
 npm install
-BACKEND_URL=http://127.0.0.1:8000 npm run dev
+npm run dev
 ```
 
 フロントエンド:
@@ -142,4 +178,4 @@ BACKEND_URL=http://127.0.0.1:8000 npm run dev
 
 ## 次の実装ステップ
 
-次はバックエンドとフロントエンドの接続設定を整理して、`env` と PostgreSQL の起動手順を明示しながら、ローカル開発環境をもう少し実務寄りに整えます。
+次は Alembic を入れて、`create_all` からマイグレーション管理へ移します。
