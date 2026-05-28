@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { getBooks, getDashboard } from "@/lib/api";
+import type { BookStatus } from "@/lib/api";
 
 const statusLabels = {
   unread: "Unread",
@@ -6,8 +9,22 @@ const statusLabels = {
   finished: "Finished",
 } as const;
 
-export default async function Home() {
-  const { books, dashboard, hasBackendError } = await loadPageData();
+type PageProps = {
+  searchParams?: Promise<{
+    q?: string;
+    status?: string;
+  }>;
+};
+
+export default async function Home({ searchParams }: PageProps) {
+  const resolvedSearchParams = await searchParams;
+  const q = resolvedSearchParams?.q?.trim() ?? "";
+  const status = toBookStatus(resolvedSearchParams?.status);
+
+  const { books, dashboard, hasBackendError } = await loadPageData({
+    q,
+    status,
+  });
 
   const readingBooks =
     dashboard.status_counts.find((item) => item.status === "reading")?.count ?? 0;
@@ -56,38 +73,58 @@ export default async function Home() {
                 Filters
               </h2>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
-                The UI now reads real backend data on the server. Search controls will
-                become interactive in the next step.
+                The page submits search values through the URL, and Next.js reloads
+                the server component with filtered data.
               </p>
             </div>
 
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-[var(--color-ink)]">
-                Search
-              </span>
-              <input
-                type="search"
-                placeholder="Title or author"
-                className="h-11 rounded-md border border-black/10 bg-[var(--color-page)] px-3 text-sm outline-none transition focus:border-black/30"
-              />
-            </label>
+            <form className="space-y-4" action="/">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-[var(--color-ink)]">
+                  Search
+                </span>
+                <input
+                  type="search"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Title or author"
+                  className="h-11 rounded-md border border-black/10 bg-[var(--color-page)] px-3 text-sm outline-none transition focus:border-black/30"
+                />
+              </label>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-[var(--color-ink)]">
-                Status
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {(["unread", "reading", "finished"] as const).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    className="h-10 rounded-md border border-black/10 bg-white px-2 text-xs font-medium text-[var(--color-muted)] transition hover:border-black/30 hover:text-[var(--color-ink)]"
-                  >
-                    {statusLabels[status]}
-                  </button>
-                ))}
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-[var(--color-ink)]">
+                  Status
+                </span>
+                <select
+                  name="status"
+                  defaultValue={status ?? ""}
+                  className="h-11 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                >
+                  <option value="">All statuses</option>
+                  {(["unread", "reading", "finished"] as const).map((item) => (
+                    <option key={item} value={item}>
+                      {statusLabels[item]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--color-ink)] px-4 text-sm font-medium text-white transition hover:bg-black/85"
+                >
+                  Apply
+                </button>
+                <Link
+                  href="/"
+                  className="inline-flex h-11 items-center justify-center rounded-md border border-black/10 bg-white px-4 text-sm font-medium text-[var(--color-ink)] transition hover:border-black/30"
+                >
+                  Reset
+                </Link>
               </div>
-            </div>
+            </form>
           </aside>
 
           <section className="rounded-lg border border-black/8 bg-white">
@@ -99,7 +136,9 @@ export default async function Home() {
                 <p className="text-sm text-[var(--color-muted)]">
                   {hasBackendError
                     ? "Backend is not reachable. Start FastAPI and reload this page."
-                    : "Live data from the FastAPI backend."}
+                    : q || status
+                      ? "Filtered results from the FastAPI backend."
+                      : "Live data from the FastAPI backend."}
                 </p>
               </div>
               <p className="text-sm text-[var(--color-muted)]">
@@ -172,9 +211,15 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-async function loadPageData() {
+async function loadPageData(filters: { q?: string; status?: BookStatus | null }) {
   try {
-    const [books, dashboard] = await Promise.all([getBooks(), getDashboard()]);
+    const [books, dashboard] = await Promise.all([
+      getBooks({
+        q: filters.q || undefined,
+        status: filters.status ?? undefined,
+      }),
+      getDashboard(),
+    ]);
 
     return {
       books,
@@ -193,4 +238,12 @@ async function loadPageData() {
       hasBackendError: true,
     };
   }
+}
+
+function toBookStatus(status?: string): BookStatus | null {
+  if (status === "unread" || status === "reading" || status === "finished") {
+    return status;
+  }
+
+  return null;
 }

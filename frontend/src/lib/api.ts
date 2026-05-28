@@ -24,8 +24,24 @@ export type Dashboard = {
 
 const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
-export async function getBooks(): Promise<Book[]> {
-  const response = await fetch(`${backendUrl}/books`, {
+export async function getBooks(filters?: {
+  q?: string;
+  status?: BookStatus;
+}): Promise<Book[]> {
+  const params = new URLSearchParams();
+
+  if (filters?.q) {
+    params.set("q", filters.q);
+  }
+
+  if (filters?.status) {
+    params.set("status", filters.status);
+  }
+
+  const queryString = params.toString();
+  const url = queryString ? `${backendUrl}/books?${queryString}` : `${backendUrl}/books`;
+
+  const response = await fetch(url, {
     cache: "no-store",
   });
 
