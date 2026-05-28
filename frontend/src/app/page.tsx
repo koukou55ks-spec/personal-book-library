@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { getBooks, getDashboard } from "@/lib/api";
+import { createBook, getBooks, getDashboard } from "@/lib/api";
 import type { BookStatus } from "@/lib/api";
 
 const statusLabels = {
@@ -11,6 +12,8 @@ const statusLabels = {
 
 type PageProps = {
   searchParams?: Promise<{
+    created?: string;
+    error?: string;
     q?: string;
     status?: string;
   }>;
@@ -18,6 +21,8 @@ type PageProps = {
 
 export default async function Home({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
+  const created = resolvedSearchParams?.created === "1";
+  const error = resolvedSearchParams?.error;
   const q = resolvedSearchParams?.q?.trim() ?? "";
   const status = toBookStatus(resolvedSearchParams?.status);
 
@@ -47,14 +52,24 @@ export default async function Home({ searchParams }: PageProps) {
                   find the one you want, and review the current reading state.
                 </p>
               </div>
-              <button
-                type="button"
+              <Link
+                href="#add-book"
                 className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--color-ink)] px-4 text-sm font-medium text-white transition hover:bg-black/85"
               >
                 Add Book
-              </button>
+              </Link>
             </div>
           </div>
+          {created ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Book created successfully.
+            </div>
+          ) : null}
+          {error ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {error}
+            </div>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-4">
             <StatCard label="Total Books" value={dashboard.total_books} />
             <StatCard label="Finished" value={dashboard.finished_books} />
@@ -68,6 +83,97 @@ export default async function Home({ searchParams }: PageProps) {
 
         <section className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="space-y-4 rounded-lg border border-black/8 bg-white p-4">
+            <div id="add-book" className="space-y-4 border-b border-black/8 pb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--color-ink)]">
+                  Add Book
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                  This form sends a typed payload to the FastAPI backend with a server
+                  action.
+                </p>
+              </div>
+
+              <form action={createBookAction} className="space-y-3">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink)]">
+                    Title
+                  </span>
+                  <input
+                    type="text"
+                    name="title"
+                    required
+                    className="h-11 rounded-md border border-black/10 bg-[var(--color-page)] px-3 text-sm outline-none transition focus:border-black/30"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink)]">
+                    Author
+                  </span>
+                  <input
+                    type="text"
+                    name="author"
+                    required
+                    className="h-11 rounded-md border border-black/10 bg-[var(--color-page)] px-3 text-sm outline-none transition focus:border-black/30"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink)]">
+                    Status
+                  </span>
+                  <select
+                    name="bookStatus"
+                    defaultValue="unread"
+                    className="h-11 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                  >
+                    {(["unread", "reading", "finished"] as const).map((item) => (
+                      <option key={item} value={item}>
+                        {statusLabels[item]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink)]">
+                    Rating
+                  </span>
+                  <select
+                    name="rating"
+                    defaultValue=""
+                    className="h-11 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                  >
+                    <option value="">No rating</option>
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-[var(--color-ink)]">
+                    Memo
+                  </span>
+                  <textarea
+                    name="memo"
+                    rows={4}
+                    className="rounded-md border border-black/10 bg-[var(--color-page)] px-3 py-2 text-sm outline-none transition focus:border-black/30"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-md bg-[var(--color-ink)] px-4 text-sm font-medium text-white transition hover:bg-black/85"
+                >
+                  Save Book
+                </button>
+              </form>
+            </div>
+
             <div>
               <h2 className="text-sm font-semibold text-[var(--color-ink)]">
                 Filters
@@ -246,4 +352,42 @@ function toBookStatus(status?: string): BookStatus | null {
   }
 
   return null;
+}
+
+async function createBookAction(formData: FormData) {
+  "use server";
+
+  const title = readRequiredField(formData, "title");
+  const author = readRequiredField(formData, "author");
+  const status = toBookStatus(formData.get("bookStatus")?.toString());
+  const ratingValue = formData.get("rating")?.toString().trim() ?? "";
+  const memoValue = formData.get("memo")?.toString().trim() ?? "";
+
+  if (!title || !author || !status) {
+    redirect("/?error=Please+fill+in+the+required+fields.");
+  }
+
+  const rating = ratingValue ? Number(ratingValue) : null;
+
+  if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    redirect("/?error=Rating+must+be+between+1+and+5.");
+  }
+
+  try {
+    await createBook({
+      title,
+      author,
+      status,
+      rating,
+      memo: memoValue || null,
+    });
+  } catch {
+    redirect("/?error=Failed+to+create+the+book.");
+  }
+
+  redirect("/?created=1");
+}
+
+function readRequiredField(formData: FormData, key: string): string {
+  return formData.get(key)?.toString().trim() ?? "";
 }

@@ -22,6 +22,14 @@ export type Dashboard = {
   status_counts: StatusCount[];
 };
 
+export type CreateBookInput = {
+  title: string;
+  author: string;
+  status: BookStatus;
+  rating: number | null;
+  memo: string | null;
+};
+
 const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 export async function getBooks(filters?: {
@@ -62,4 +70,20 @@ export async function getDashboard(): Promise<Dashboard> {
   }
 
   return (await response.json()) as Dashboard;
+}
+
+export async function createBook(payload: CreateBookInput): Promise<Book> {
+  const response = await fetch(`${backendUrl}/books`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create book");
+  }
+
+  return (await response.json()) as Book;
 }
