@@ -1,12 +1,12 @@
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Book
-from app.schemas import BookCreate, BookResponse
+from app.schemas import BookCreate, BookResponse, BookUpdate
 
 router = APIRouter()
 
@@ -34,3 +34,37 @@ def create_book(payload: BookCreate, db: Session = Depends(get_db)) -> Book:
     db.commit()
     db.refresh(book)
     return book
+
+
+@router.put("/books/{book_id}", response_model=BookResponse, tags=["books"])
+def update_book(
+    book_id: int,
+    payload: BookUpdate,
+    db: Session = Depends(get_db),
+) -> Book:
+    book = db.get(Book, book_id)
+    if book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found",
+        )
+
+    for field_name, value in payload.model_dump(exclude_unset=True).items():
+        setattr(book, field_name, value)
+
+    db.commit()
+    db.refresh(book)
+    return book
+
+
+@router.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["books"])
+def delete_book(book_id: int, db: Session = Depends(get_db)) -> None:
+    book = db.get(Book, book_id)
+    if book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found",
+        )
+
+    db.delete(book)
+    db.commit()

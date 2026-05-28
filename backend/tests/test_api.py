@@ -62,3 +62,68 @@ def test_created_book_is_returned_by_list_books(client: TestClient) -> None:
     body = response.json()
     assert len(body) == 1
     assert body[0]["title"] == "Atomic Habits"
+
+
+def test_update_book(client: TestClient) -> None:
+    create_response = client.post(
+        "/books",
+        json={
+            "title": "Clean Code",
+            "author": "Robert C. Martin",
+            "status": "unread",
+            "rating": None,
+            "memo": None,
+        },
+    )
+    book_id = create_response.json()["id"]
+
+    response = client.put(
+        f"/books/{book_id}",
+        json={
+            "status": "finished",
+            "rating": 5,
+            "memo": "Finished and worth reviewing.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "Clean Code"
+    assert body["status"] == "finished"
+    assert body["rating"] == 5
+    assert body["memo"] == "Finished and worth reviewing."
+
+
+def test_update_missing_book_returns_404(client: TestClient) -> None:
+    response = client.put("/books/999", json={"status": "finished"})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Book not found"}
+
+
+def test_delete_book(client: TestClient) -> None:
+    create_response = client.post(
+        "/books",
+        json={
+            "title": "The Pragmatic Programmer",
+            "author": "David Thomas and Andrew Hunt",
+            "status": "reading",
+            "rating": 5,
+            "memo": "Classic software book.",
+        },
+    )
+    book_id = create_response.json()["id"]
+
+    delete_response = client.delete(f"/books/{book_id}")
+    list_response = client.get("/books")
+
+    assert delete_response.status_code == 204
+    assert list_response.status_code == 200
+    assert list_response.json() == []
+
+
+def test_delete_missing_book_returns_404(client: TestClient) -> None:
+    response = client.delete("/books/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Book not found"}
