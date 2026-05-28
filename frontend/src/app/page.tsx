@@ -20,8 +20,10 @@ type PageProps = {
   searchParams?: Promise<{
     created?: string;
     deleted?: string;
+    edit?: string;
     updated?: string;
     error?: string;
+    form?: string;
     q?: string;
     status?: string;
   }>;
@@ -31,7 +33,9 @@ export default async function Home({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const created = resolvedSearchParams?.created === "1";
   const deleted = resolvedSearchParams?.deleted === "1";
+  const edit = resolvedSearchParams?.edit;
   const error = resolvedSearchParams?.error;
+  const form = resolvedSearchParams?.form;
   const q = resolvedSearchParams?.q?.trim() ?? "";
   const status = toBookStatus(resolvedSearchParams?.status);
   const updated = resolvedSearchParams?.updated === "1";
@@ -85,11 +89,6 @@ export default async function Home({ searchParams }: PageProps) {
               Book deleted successfully.
             </div>
           ) : null}
-          {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              {error}
-            </div>
-          ) : null}
           <div className="grid gap-3 md:grid-cols-4">
             <StatCard label="Total Books" value={dashboard.total_books} />
             <StatCard label="Finished" value={dashboard.finished_books} />
@@ -113,8 +112,13 @@ export default async function Home({ searchParams }: PageProps) {
                   action.
                 </p>
               </div>
+              {form === "create" && error ? (
+                <FormError message={error} />
+              ) : null}
 
               <form action={createBookAction} className="space-y-3">
+                <input type="hidden" name="q" value={q} />
+                <input type="hidden" name="status" value={status ?? ""} />
                 <label className="flex flex-col gap-2">
                   <span className="text-sm font-medium text-[var(--color-ink)]">
                     Title
@@ -318,7 +322,10 @@ export default async function Home({ searchParams }: PageProps) {
                         {book.memo || "-"}
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <details className="group min-w-52">
+                        <details
+                          className="group min-w-52"
+                          open={edit === String(book.id)}
+                        >
                           <summary className="cursor-pointer list-none text-sm font-medium text-[var(--color-ink)] marker:hidden">
                             <span className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 transition group-open:bg-black/[0.04] hover:border-black/30">
                               Edit
@@ -329,6 +336,12 @@ export default async function Home({ searchParams }: PageProps) {
                             className="mt-3 space-y-3 rounded-md border border-black/8 bg-[var(--color-page)] p-3"
                           >
                             <input type="hidden" name="id" value={book.id} />
+                            <input type="hidden" name="q" value={q} />
+                            <input type="hidden" name="status" value={status ?? ""} />
+
+                            {form === `update-${book.id}` && error ? (
+                              <FormError message={error} />
+                            ) : null}
 
                             <label className="flex flex-col gap-1.5">
                               <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
@@ -417,6 +430,8 @@ export default async function Home({ searchParams }: PageProps) {
                               <button
                                 type="submit"
                                 formAction={deleteBookAction}
+                                name="id"
+                                value={book.id}
                                 className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-white px-3 text-sm font-medium text-red-700 transition hover:bg-red-50"
                               >
                                 Delete
@@ -442,6 +457,14 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
     <div className="rounded-lg border border-black/8 bg-white p-4">
       <p className="text-sm text-[var(--color-muted)]">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-[var(--color-ink)]">{value}</p>
+    </div>
+  );
+}
+
+function FormError({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+      {message}
     </div>
   );
 }
@@ -486,59 +509,86 @@ function toBookStatus(status?: string): BookStatus | null {
 async function createBookAction(formData: FormData) {
   "use server";
 
-  const payload = parseBookFormData(formData);
+  const filters = readFilters(formData);
+  const payload = parseBookFormData(formData, filters, "create");
 
   try {
     await createBook(payload);
   } catch {
-    redirect("/?error=Failed+to+create+the+book.");
+    redirectToState(filters, {
+      error: "Failed to create the book.",
+      form: "create",
+    });
   }
 
-  redirect("/?created=1");
+  redirectToState(filters, { created: "1" });
 }
 
 async function updateBookAction(formData: FormData) {
   "use server";
 
   const id = Number(formData.get("id"));
-  const payload = parseBookFormData(formData);
+  const filters = readFilters(formData);
 
   if (!Number.isInteger(id) || id < 1) {
-    redirect("/?error=Invalid+book+id.");
+    redirectToState(filters, {
+      error: "Invalid book id.",
+      form: `update-${id}`,
+      edit: String(id),
+    });
   }
+
+  const payload = parseBookFormData(formData, filters, `update-${id}`, String(id));
 
   try {
     await updateBook(id, payload);
   } catch {
-    redirect("/?error=Failed+to+update+the+book.");
+    redirectToState(filters, {
+      error: "Failed to update the book.",
+      form: `update-${id}`,
+      edit: String(id),
+    });
   }
 
-  redirect("/?updated=1");
+  redirectToState(filters, { updated: "1" });
 }
 
 async function deleteBookAction(formData: FormData) {
   "use server";
 
   const id = Number(formData.get("id"));
+  const filters = readFilters(formData);
 
   if (!Number.isInteger(id) || id < 1) {
-    redirect("/?error=Invalid+book+id.");
+    redirectToState(filters, {
+      error: "Invalid book id.",
+      form: "delete",
+    });
   }
 
   try {
     await deleteBook(id);
   } catch {
-    redirect("/?error=Failed+to+delete+the+book.");
+    redirectToState(filters, {
+      error: "Failed to delete the book.",
+      form: `update-${id}`,
+      edit: String(id),
+    });
   }
 
-  redirect("/?deleted=1");
+  redirectToState(filters, { deleted: "1" });
 }
 
 function readRequiredField(formData: FormData, key: string): string {
   return formData.get(key)?.toString().trim() ?? "";
 }
 
-function parseBookFormData(formData: FormData) {
+function parseBookFormData(
+  formData: FormData,
+  filters: { q: string; status: string },
+  form: string,
+  edit?: string,
+) {
   const title = readRequiredField(formData, "title");
   const author = readRequiredField(formData, "author");
   const status = toBookStatus(formData.get("bookStatus")?.toString());
@@ -546,13 +596,21 @@ function parseBookFormData(formData: FormData) {
   const memoValue = formData.get("memo")?.toString().trim() ?? "";
 
   if (!title || !author || !status) {
-    redirect("/?error=Please+fill+in+the+required+fields.");
+    redirectToState(filters, {
+      error: "Please fill in the required fields.",
+      form,
+      edit,
+    });
   }
 
   const rating = ratingValue ? Number(ratingValue) : null;
 
   if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
-    redirect("/?error=Rating+must+be+between+1+and+5.");
+    redirectToState(filters, {
+      error: "Rating must be between 1 and 5.",
+      form,
+      edit,
+    });
   }
 
   return {
@@ -562,4 +620,35 @@ function parseBookFormData(formData: FormData) {
     rating,
     memo: memoValue || null,
   };
+}
+
+function readFilters(formData: FormData) {
+  return {
+    q: formData.get("q")?.toString().trim() ?? "",
+    status: formData.get("status")?.toString().trim() ?? "",
+  };
+}
+
+function redirectToState(
+  filters: { q: string; status: string },
+  state: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams();
+
+  if (filters.q) {
+    params.set("q", filters.q);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  for (const [key, value] of Object.entries(state)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+  redirect(query ? `/?${query}` : "/");
 }
