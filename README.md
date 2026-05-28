@@ -42,6 +42,12 @@ frontend/
     app/
       layout.tsx
       page.tsx
+    components/
+      library/
+        add-book-form.tsx
+        book-filters.tsx
+        book-table.tsx
+        library-header.tsx
     lib/
       api.ts
   package.json
@@ -112,6 +118,7 @@ BACKEND_URL=http://127.0.0.1:8000 npm run dev
 - Server Action を使った登録フォーム
 - Server Action を使った更新・削除
 - 操作後に URL 状態を維持するリダイレクト処理
+- 画面を小さな React コンポーネントへ分割する整理
 - TypeScript の API 型定義
 
 ## いま学べる SQL のポイント
@@ -135,4 +142,4 @@ BACKEND_URL=http://127.0.0.1:8000 npm run dev
 
 ## 次の実装ステップ
 
-次はフロントエンドの画面を分割して、一覧・作成・編集の責務を整理しながら、React のコンポーネント分割を学べる形に進めます。
+次はバックエンドとフロントエンドの接続設定を整理して、`env` と PostgreSQL の起動手順を明示しながら、ローカル開発環境をもう少し実務寄りに整えます。
