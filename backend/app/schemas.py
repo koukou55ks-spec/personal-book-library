@@ -32,3 +32,15 @@ class BookResponse(BaseModel):
     rating: Optional[int]
     memo: Optional[str]
     created_at: datetime
+
+
+class StatusCount(BaseModel):
+    status: ReadingStatus
+    count: int
+
+
+class DashboardResponse(BaseModel):
+    total_books: int
+    finished_books: int
+    average_rating: Optional[float]
+    status_counts: list[StatusCount]

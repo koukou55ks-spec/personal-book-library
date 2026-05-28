@@ -2,12 +2,18 @@ from collections.abc import Sequence
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Book, ReadingStatus
-from app.schemas import BookCreate, BookResponse, BookUpdate
+from app.schemas import (
+    BookCreate,
+    BookResponse,
+    BookUpdate,
+    DashboardResponse,
+    StatusCount,
+)
 
 router = APIRouter()
 
@@ -91,3 +97,32 @@ def delete_book(book_id: int, db: Session = Depends(get_db)) -> None:
 
     db.delete(book)
     db.commit()
+
+
+@router.get("/dashboard", response_model=DashboardResponse, tags=["dashboard"])
+def get_dashboard(db: Session = Depends(get_db)) -> DashboardResponse:
+    total_books = db.scalar(select(func.count()).select_from(Book)) or 0
+
+    finished_books = db.scalar(
+        select(func.count()).select_from(Book).where(Book.status == ReadingStatus.finished)
+    ) or 0
+
+    average_rating = db.scalar(select(func.avg(Book.rating)).where(Book.rating.is_not(None)))
+
+    status_rows = db.execute(
+        select(Book.status, func.count(Book.id))
+        .group_by(Book.status)
+        .order_by(Book.status.asc())
+    ).all()
+
+    status_counts = [
+        StatusCount(status=status, count=count)
+        for status, count in status_rows
+    ]
+
+    return DashboardResponse(
+        total_books=total_books,
+        finished_books=finished_books,
+        average_rating=float(average_rating) if average_rating is not None else None,
+        status_counts=status_counts,
+    )

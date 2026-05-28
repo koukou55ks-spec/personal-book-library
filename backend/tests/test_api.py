@@ -217,3 +217,61 @@ def test_delete_missing_book_returns_404(client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Book not found"}
+
+
+def test_dashboard_returns_empty_stats_initially(client: TestClient) -> None:
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_books": 0,
+        "finished_books": 0,
+        "average_rating": None,
+        "status_counts": [],
+    }
+
+
+def test_dashboard_returns_aggregated_stats(client: TestClient) -> None:
+    client.post(
+        "/books",
+        json={
+            "title": "Atomic Habits",
+            "author": "James Clear",
+            "status": "finished",
+            "rating": 5,
+            "memo": None,
+        },
+    )
+    client.post(
+        "/books",
+        json={
+            "title": "Deep Work",
+            "author": "Cal Newport",
+            "status": "reading",
+            "rating": 4,
+            "memo": None,
+        },
+    )
+    client.post(
+        "/books",
+        json={
+            "title": "Refactoring",
+            "author": "Martin Fowler",
+            "status": "finished",
+            "rating": None,
+            "memo": None,
+        },
+    )
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_books": 3,
+        "finished_books": 2,
+        "average_rating": 4.5,
+        "status_counts": [
+            {"status": "finished", "count": 2},
+            {"status": "reading", "count": 1},
+        ],
+    }
