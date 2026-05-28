@@ -1,4 +1,4 @@
-import { sampleBooks, sampleSummary } from "@/lib/sample-data";
+import { getBooks, getDashboard } from "@/lib/api";
 
 const statusLabels = {
   unread: "Unread",
@@ -6,7 +6,12 @@ const statusLabels = {
   finished: "Finished",
 } as const;
 
-export default function Home() {
+export default async function Home() {
+  const { books, dashboard, hasBackendError } = await loadPageData();
+
+  const readingBooks =
+    dashboard.status_counts.find((item) => item.status === "reading")?.count ?? 0;
+
   return (
     <main className="min-h-screen bg-[var(--color-page)]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-10">
@@ -34,10 +39,13 @@ export default function Home() {
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
-            <StatCard label="Total Books" value={sampleSummary.totalBooks} />
-            <StatCard label="Finished" value={sampleSummary.finishedBooks} />
-            <StatCard label="Average Rating" value={sampleSummary.averageRating} />
-            <StatCard label="Reading Now" value={sampleSummary.readingBooks} />
+            <StatCard label="Total Books" value={dashboard.total_books} />
+            <StatCard label="Finished" value={dashboard.finished_books} />
+            <StatCard
+              label="Average Rating"
+              value={dashboard.average_rating?.toFixed(1) ?? "-"}
+            />
+            <StatCard label="Reading Now" value={readingBooks} />
           </div>
         </header>
 
@@ -48,8 +56,8 @@ export default function Home() {
                 Filters
               </h2>
               <p className="mt-1 text-sm text-[var(--color-muted)]">
-                The first frontend step is a clear list screen. Form inputs and API
-                wiring come next.
+                The UI now reads real backend data on the server. Search controls will
+                become interactive in the next step.
               </p>
             </div>
 
@@ -89,15 +97,28 @@ export default function Home() {
                   Books
                 </h2>
                 <p className="text-sm text-[var(--color-muted)]">
-                  Static sample data for the initial UI scaffold.
+                  {hasBackendError
+                    ? "Backend is not reachable. Start FastAPI and reload this page."
+                    : "Live data from the FastAPI backend."}
                 </p>
               </div>
               <p className="text-sm text-[var(--color-muted)]">
-                {sampleBooks.length} items
+                {books.length} items
               </p>
             </div>
 
             <div className="overflow-x-auto">
+              {hasBackendError ? (
+                <div className="px-4 py-10 text-sm text-[var(--color-muted)]">
+                  Unable to load data from <code className="font-mono">{`BACKEND_URL`}</code>.
+                </div>
+              ) : books.length === 0 ? (
+                <div className="px-4 py-10 text-sm text-[var(--color-muted)]">
+                  No books yet. Add your first book from the backend API or the next
+                  frontend form step.
+                </div>
+              ) : null}
+
               <table className="min-w-full border-collapse">
                 <thead>
                   <tr className="border-b border-black/8 bg-black/[0.02] text-left text-xs uppercase tracking-[0.08em] text-[var(--color-muted)]">
@@ -109,7 +130,7 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sampleBooks.map((book) => (
+                  {books.map((book) => (
                     <tr key={book.id} className="border-b border-black/6 last:border-b-0">
                       <td className="px-4 py-4 align-top">
                         <div className="font-medium text-[var(--color-ink)]">
@@ -149,4 +170,27 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
       <p className="mt-2 text-2xl font-semibold text-[var(--color-ink)]">{value}</p>
     </div>
   );
+}
+
+async function loadPageData() {
+  try {
+    const [books, dashboard] = await Promise.all([getBooks(), getDashboard()]);
+
+    return {
+      books,
+      dashboard,
+      hasBackendError: false,
+    };
+  } catch {
+    return {
+      books: [],
+      dashboard: {
+        total_books: 0,
+        finished_books: 0,
+        average_rating: null,
+        status_counts: [],
+      },
+      hasBackendError: true,
+    };
+  }
 }
