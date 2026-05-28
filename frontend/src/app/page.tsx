@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createBook, getBooks, getDashboard } from "@/lib/api";
+import {
+  createBook,
+  deleteBook,
+  getBooks,
+  getDashboard,
+  updateBook,
+} from "@/lib/api";
 import type { BookStatus } from "@/lib/api";
 
 const statusLabels = {
@@ -13,6 +19,8 @@ const statusLabels = {
 type PageProps = {
   searchParams?: Promise<{
     created?: string;
+    deleted?: string;
+    updated?: string;
     error?: string;
     q?: string;
     status?: string;
@@ -22,9 +30,11 @@ type PageProps = {
 export default async function Home({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const created = resolvedSearchParams?.created === "1";
+  const deleted = resolvedSearchParams?.deleted === "1";
   const error = resolvedSearchParams?.error;
   const q = resolvedSearchParams?.q?.trim() ?? "";
   const status = toBookStatus(resolvedSearchParams?.status);
+  const updated = resolvedSearchParams?.updated === "1";
 
   const { books, dashboard, hasBackendError } = await loadPageData({
     q,
@@ -63,6 +73,16 @@ export default async function Home({ searchParams }: PageProps) {
           {created ? (
             <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
               Book created successfully.
+            </div>
+          ) : null}
+          {updated ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Book updated successfully.
+            </div>
+          ) : null}
+          {deleted ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Book deleted successfully.
             </div>
           ) : null}
           {error ? (
@@ -272,6 +292,7 @@ export default async function Home({ searchParams }: PageProps) {
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Rating</th>
                     <th className="px-4 py-3 font-medium">Memo</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -295,6 +316,114 @@ export default async function Home({ searchParams }: PageProps) {
                       </td>
                       <td className="px-4 py-4 align-top text-sm leading-6 text-[var(--color-muted)]">
                         {book.memo || "-"}
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <details className="group min-w-52">
+                          <summary className="cursor-pointer list-none text-sm font-medium text-[var(--color-ink)] marker:hidden">
+                            <span className="inline-flex h-9 items-center justify-center rounded-md border border-black/10 px-3 transition group-open:bg-black/[0.04] hover:border-black/30">
+                              Edit
+                            </span>
+                          </summary>
+                          <form
+                            action={updateBookAction}
+                            className="mt-3 space-y-3 rounded-md border border-black/8 bg-[var(--color-page)] p-3"
+                          >
+                            <input type="hidden" name="id" value={book.id} />
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                                Title
+                              </span>
+                              <input
+                                type="text"
+                                name="title"
+                                required
+                                defaultValue={book.title}
+                                className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                              />
+                            </label>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                                Author
+                              </span>
+                              <input
+                                type="text"
+                                name="author"
+                                required
+                                defaultValue={book.author}
+                                className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                              />
+                            </label>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="flex flex-col gap-1.5">
+                                <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                                  Status
+                                </span>
+                                <select
+                                  name="bookStatus"
+                                  defaultValue={book.status}
+                                  className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                                >
+                                  {(["unread", "reading", "finished"] as const).map(
+                                    (item) => (
+                                      <option key={item} value={item}>
+                                        {statusLabels[item]}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </label>
+
+                              <label className="flex flex-col gap-1.5">
+                                <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                                  Rating
+                                </span>
+                                <select
+                                  name="rating"
+                                  defaultValue={book.rating ?? ""}
+                                  className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none transition focus:border-black/30"
+                                >
+                                  <option value="">No rating</option>
+                                  {[1, 2, 3, 4, 5].map((value) => (
+                                    <option key={value} value={value}>
+                                      {value}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                                Memo
+                              </span>
+                              <textarea
+                                name="memo"
+                                rows={3}
+                                defaultValue={book.memo ?? ""}
+                                className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/30"
+                              />
+                            </label>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="submit"
+                                className="inline-flex h-10 items-center justify-center rounded-md bg-[var(--color-ink)] px-3 text-sm font-medium text-white transition hover:bg-black/85"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="submit"
+                                formAction={deleteBookAction}
+                                className="inline-flex h-10 items-center justify-center rounded-md border border-red-200 bg-white px-3 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </form>
+                        </details>
                       </td>
                     </tr>
                   ))}
@@ -357,6 +486,59 @@ function toBookStatus(status?: string): BookStatus | null {
 async function createBookAction(formData: FormData) {
   "use server";
 
+  const payload = parseBookFormData(formData);
+
+  try {
+    await createBook(payload);
+  } catch {
+    redirect("/?error=Failed+to+create+the+book.");
+  }
+
+  redirect("/?created=1");
+}
+
+async function updateBookAction(formData: FormData) {
+  "use server";
+
+  const id = Number(formData.get("id"));
+  const payload = parseBookFormData(formData);
+
+  if (!Number.isInteger(id) || id < 1) {
+    redirect("/?error=Invalid+book+id.");
+  }
+
+  try {
+    await updateBook(id, payload);
+  } catch {
+    redirect("/?error=Failed+to+update+the+book.");
+  }
+
+  redirect("/?updated=1");
+}
+
+async function deleteBookAction(formData: FormData) {
+  "use server";
+
+  const id = Number(formData.get("id"));
+
+  if (!Number.isInteger(id) || id < 1) {
+    redirect("/?error=Invalid+book+id.");
+  }
+
+  try {
+    await deleteBook(id);
+  } catch {
+    redirect("/?error=Failed+to+delete+the+book.");
+  }
+
+  redirect("/?deleted=1");
+}
+
+function readRequiredField(formData: FormData, key: string): string {
+  return formData.get(key)?.toString().trim() ?? "";
+}
+
+function parseBookFormData(formData: FormData) {
   const title = readRequiredField(formData, "title");
   const author = readRequiredField(formData, "author");
   const status = toBookStatus(formData.get("bookStatus")?.toString());
@@ -373,21 +555,11 @@ async function createBookAction(formData: FormData) {
     redirect("/?error=Rating+must+be+between+1+and+5.");
   }
 
-  try {
-    await createBook({
-      title,
-      author,
-      status,
-      rating,
-      memo: memoValue || null,
-    });
-  } catch {
-    redirect("/?error=Failed+to+create+the+book.");
-  }
-
-  redirect("/?created=1");
-}
-
-function readRequiredField(formData: FormData, key: string): string {
-  return formData.get(key)?.toString().trim() ?? "";
+  return {
+    title,
+    author,
+    status,
+    rating,
+    memo: memoValue || null,
+  };
 }

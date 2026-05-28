@@ -87,3 +87,32 @@ export async function createBook(payload: CreateBookInput): Promise<Book> {
 
   return (await response.json()) as Book;
 }
+
+export async function updateBook(
+  id: number,
+  payload: CreateBookInput,
+): Promise<Book> {
+  const response = await fetch(`${backendUrl}/books/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update book");
+  }
+
+  return (await response.json()) as Book;
+}
+
+export async function deleteBook(id: number): Promise<void> {
+  const response = await fetch(`${backendUrl}/books/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete book");
+  }
+}
